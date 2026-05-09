@@ -49,6 +49,7 @@ const result = await streamPuterCompletion({
       tools: [{ type: 'web_search' }],  // Enable web search
     },
   },
+  tools: [{ type: 'web_search' }],      // Alternatively, pass tools at top level
   onChunk: (chunk) => {
     console.log('Raw chunk:', chunk);
   },
@@ -234,9 +235,14 @@ const aiPrompt = `Context from website:\n${context.map(f =>
 - `saveTokensToStorage` (function): Persists token metadata
 - `effectiveMaxRetries` (number): Number of retry attempts
 - `showLoadingIndicator` (function): UI callback for loading state
+- `modeConfig` (object): Optional mode configuration for loading indicator
+- `documentOutputElement` (HTMLElement): Optional DOM element reference for loading indicator
 - `signal` (AbortSignal): Optional abort controller signal
+- `tools` (array): Array of tool definitions forwarded to the model. Supports:
+  - Web search: `[{ type: 'web_search' }]`
+  - OpenAI function tools: `[{ type: 'function', function: { name, description, parameters } }]`
 
-**Returns:** Promise resolving to normalized Puter API response
+**Returns:** Promise resolving to normalized Puter API response with an additional `toolCalls` array: `[{ id, name, input }, ...]`
 
 ### scrapeWeb(startUrl, options)
 

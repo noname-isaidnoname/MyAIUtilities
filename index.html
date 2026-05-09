@@ -173,29 +173,57 @@
         </div>
 
         <div class="code">
-// Quick example with puterStream
+// Quick example with puterStream (web search enabled)
 import { streamPuterCompletion } from './puterStream.js';
 // or if you're on another project, do this instead:
 // import { streamPuterCompletion } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterStream.js';
 
 const result = await streamPuterCompletion({
+    apiUrl: 'https://api.puter.com/drivers/call',
     requestBody: {
         interface: 'puter-chat-completion',
-        driver: 'openai',
+        driver: 'ai-chat',
+        test_mode: true,
         method: 'complete',
         args: {
             model: 'openai/gpt-4o',
             messages: [{ role: 'user', content: 'Hello!' }],
-            stream: true
+            stream: true,
+            tools: [{ type: 'web_search' }]  // Enable web search
         }
     },
-    onPartialUpdate: ({ accumulatedContent }) => {
+    tools: [{ type: 'web_search' }],  // Or pass tools at top level
+    onPartialUpdate: ({ accumulatedContent, accumulatedReasoning, accumulatedToolUses }) => {
         // Update your UI here with the accumulated content
-        // For example, you could update a textarea or div with the content
         // document.getElementById('output').value = accumulatedContent;
         // console.log('Streaming:', accumulatedContent);
+    },
+    onToolUse: (toolUse) => {
+        console.log('Tool called:', toolUse.name, toolUse.input);
+    },
+    onComplete: (finalState) => {
+        console.log('Complete:', finalState);
+    },
+    onError: (error) => {
+        console.error('Stream error:', error);
     }
 });
+
+// Quick example with puterRequest (non-streaming with tools)
+import { generatePuterResponse } from './puterRequest.js';
+
+const result = await generatePuterResponse({
+    payload: {
+        messages: [{ role: 'user', content: 'What is the capital of France?' }]
+    },
+    reqBody: {
+        model: 'openai/gpt-4o'
+    },
+    getCurrentToken: () => 'your-puter-api-token',
+    tools: [{ type: 'web_search' }],  // Enable web search
+    effectiveMaxRetries: 3
+});
+console.log('AI Response:', result.choices[0].message.content);
         </div>
     </div>
 

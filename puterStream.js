@@ -36,23 +36,53 @@ Reusable Puter.ai streaming helper that reads newline-delimited JSON chunks from
  *  
  * The helper returns a promise resolving to:  
  *   { accumulatedContent, accumulatedReasoning, accumulatedToolUses }  
- */
-
+ *  
+ * tools  — array of tool definitions forwarded to the model, e.g.  
+ *             [{ type: 'web_search' }]  
+ *             or OpenAI-style function tools:  
+ *             [{  
+ *               type: 'function',  
+ *               function: {  
+ *                 name: 'get_weather',  
+ *                 description: 'Get current weather',  
+ *                 parameters: {  
+ *                   type: 'object',  
+ *                   properties: { location: { type: 'string' } },  
+ *                   required: ['location']  
+ *                 }  
+ *               }  
+ *             }]  
+ *  
+ * If tools are already present in requestBody.args.tools they are preserved;  
+ * the explicit `tools` parameter is merged on top (explicit wins).  
+ */  
 export async function streamPuterCompletion({  
   apiUrl = 'https://api.puter.com/drivers/call',  
   requestBody,  
   headers = {},  
+  tools = null,              // NEW: tool definitions array  
   onChunk = () => {},  
   onPartialUpdate = () => {},  
   onComplete = () => {},  
   onError = () => {},  
-  onToolUse = () => {},       // NEW: called for every tool_use chunk  
+  onToolUse = () => {},  
   signal = null  
 } = {}) {  
   if (!requestBody) {  
     const err = new Error('requestBody is required for streamPuterCompletion');  
     onError(err);  
     throw err;  
+  }  
+  
+  // ── Merge tools into requestBody.args if provided ──────────────────────────  
+  if (tools && Array.isArray(tools) && tools.length > 0) {  
+    requestBody = {  
+      ...requestBody,  
+      args: {  
+        ...(requestBody.args || {}),  
+        tools                          // explicit param wins over anything in args  
+      }  
+    };  
   }  
   
   try {  
@@ -75,7 +105,6 @@ export async function streamPuterCompletion({
     }  
   
     if (!response.body || !response.body.getReader) {  
-      // Not a streaming response; attempt to parse the full body as fallback  
       const text = await response.text();  
   
       if (text.includes('no fallback model available')) {  
@@ -98,9 +127,28 @@ export async function streamPuterCompletion({
         const accumulatedContent = (obj.text || obj.content || '') + '';  
         const accumulatedReasoning = (obj.reasoning || '') + '';  
         const accumulatedToolUses = [];  
+        // ── handle tool_use in non-streaming fallback ──────────────────────  
         if (obj.type === 'tool_use') {  
           accumulatedToolUses.push(obj);  
           try { onToolUse(obj); } catch (e) { /* swallow */ }  
+        }  
+        // ── handle OpenAI-style tool_calls in non-streaming fallback ───────  
+        const toolCalls = obj.choices?.[0]?.message?.tool_calls  
+                       || obj.result?.message?.tool_calls;  
+        if (Array.isArray(toolCalls)) {  
+          for (const tc of toolCalls) {  
+            const toolUse = {  
+              type: 'tool_use',  
+              id: tc.id,  
+              name: tc.function?.name,  
+              input: (() => {  
+                try { return JSON.parse(tc.function?.arguments || '{}'); }  
+                catch (e) { return tc.function?.arguments || {}; }  
+              })()  
+            };  
+            accumulatedToolUses.push(toolUse);  
+            try { onToolUse(toolUse); } catch (e) { /* swallow */ }  
+          }  
         }  
         const finalState = { accumulatedContent, accumulatedReasoning, accumulatedToolUses };  
         onPartialUpdate(finalState);  
@@ -119,7 +167,7 @@ export async function streamPuterCompletion({
   
     let accumulatedContent = '';  
     let accumulatedReasoning = '';  
-    let accumulatedToolUses = [];   // NEW: collects every tool_use chunk  
+    let accumulatedToolUses = [];  
   
     const emitPartial = () => {  
       try {  
@@ -127,11 +175,9 @@ export async function streamPuterCompletion({
       } catch (e) { /* swallow */ }  
     };  
   
-    // ── helper: process one parsed chunk object ──────────────────────────────  
     const processChunk = (obj) => {  
       if (!obj) return;  
   
-      // ── error detection ────────────────────────────────────────────────────  
       const objStr = JSON.stringify(obj);  
       if (objStr.includes('no fallback model available')) {  
         const isActualError = (  
@@ -144,9 +190,8 @@ export async function streamPuterCompletion({
         if (isActualError) {  
           throw new Error('NO_FALLBACK_MODEL: No fallback model available. Please try a different model or check your API configuration.');  
         }  
-      }
+      }  
   
-      // ── raw chunk to caller ────────────────────────────────────────────────  
       try { onChunk(obj); } catch (e) { /* swallow */ }  
   
       // ── text / content ─────────────────────────────────────────────────────  
@@ -159,33 +204,46 @@ export async function streamPuterCompletion({
         accumulatedReasoning += (obj.reasoning || obj.text || '');  
       }  
   
-      // ── tool_use (web search call or function call) ────────────────────────  
-      // Puter emits { type: 'tool_use', id, name, input: { ... } }  
-      // For OpenAI built-in web_search the name is typically 'web_search'.  
-      // For custom function tools the name matches the function you defined.  
+      // ── Puter-native tool_use chunk ────────────────────────────────────────  
       if (obj.type === 'tool_use') {  
         accumulatedToolUses.push(obj);  
         try { onToolUse(obj); } catch (e) { /* swallow */ }  
       }  
   
-      // ── extra_content (Gemini metadata, citations, etc.) ───────────────────  
-      // Already forwarded via onChunk above; callers can inspect obj.extra_content.  
-      // No accumulation needed here unless you want to collect it.  
-  
-      // ── usage (end-of-stream token counts) ────────────────────────────────  
-      // Already forwarded via onChunk; obj.usage contains the counts.  
+      // ── OpenAI-style tool_calls (delta or full) ────────────────────────────  
+      // Streaming: choices[0].delta.tool_calls  
+      // Non-streaming inside a stream: choices[0].message.tool_calls  
+      const deltaToolCalls = obj.choices?.[0]?.delta?.tool_calls  
+                          || obj.choices?.[0]?.message?.tool_calls  
+                          || obj.result?.message?.tool_calls;  
+      if (Array.isArray(deltaToolCalls)) {  
+        for (const tc of deltaToolCalls) {  
+          // Only emit complete tool calls (must have id + name)  
+          if (!tc.id && !tc.function?.name) continue;  
+          const toolUse = {  
+            type: 'tool_use',  
+            id: tc.id,  
+            name: tc.function?.name,  
+            input: (() => {  
+              try { return JSON.parse(tc.function?.arguments || '{}'); }  
+              catch (e) { return tc.function?.arguments || {}; }  
+            })()  
+          };  
+          accumulatedToolUses.push(toolUse);  
+          try { onToolUse(toolUse); } catch (e) { /* swallow */ }  
+        }  
+      }  
   
       emitPartial();  
     };  
   
-    // ── main read loop ───────────────────────────────────────────────────────  
     while (true) {  
       const { value, done } = await reader.read();  
       if (done) break;  
   
       buffer += decoder.decode(value, { stream: true });  
       const parts = buffer.split('\n');  
-      buffer = parts.pop(); // keep last partial line  
+      buffer = parts.pop();  
   
       for (const part of parts) {  
         const line = part.trim();  
@@ -200,7 +258,7 @@ export async function streamPuterCompletion({
             onError(err);  
             throw err;  
           }  
-          continue; // not a JSON chunk; skip  
+          continue;  
         }  
   
         try {  
@@ -212,14 +270,11 @@ export async function streamPuterCompletion({
       }  
     }  
   
-    // ── flush remaining buffer ───────────────────────────────────────────────  
     if (buffer.trim()) {  
       try {  
         const finalObj = JSON.parse(buffer);  
         processChunk(finalObj);  
-      } catch (e) {  
-        // ignore final parse / processing error  
-      }  
+      } catch (e) { /* ignore */ }  
     }  
   
     const finalState = { accumulatedContent, accumulatedReasoning, accumulatedToolUses };  
@@ -230,4 +285,4 @@ export async function streamPuterCompletion({
     try { onError(error); } catch (e) { /* swallow */ }  
     throw error;  
   }  
-} 
+}

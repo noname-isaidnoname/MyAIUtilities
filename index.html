@@ -147,6 +147,31 @@
             <div id="output" style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 4px; min-height: 50px; white-space: pre-wrap;"></div>
         </div>
 
+        <div class="demo-section">
+            <h3>Web Scraping Demo</h3>
+            <p>Test the web scraping utility (scrapeWeb.js) - extracts content from same-origin websites:</p>
+            <input type="url" id="scrape-url" placeholder="Enter URL to scrape (e.g., https://example.com)" value="https://example.com" style="width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 4px;">
+            
+            <div style="margin: 0.5rem 0;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.9rem;">Max pages:</span>
+                    <input type="number" id="max-pages" value="5" min="1" max="50" style="width: 60px; padding: 0.25rem; border: 1px solid #ddd; border-radius: 4px;">
+                </label>
+            </div>
+            
+            <div style="margin: 0.5rem 0;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.9rem;">Max depth:</span>
+                    <input type="number" id="max-depth" value="2" min="1" max="5" style="width: 60px; padding: 0.25rem; border: 1px solid #ddd; border-radius: 4px;">
+                </label>
+            </div>
+            
+            <button onclick="testScraping()" style="background: #48bb78; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer;">Start Scraping</button>
+            <button onclick="stopScraping()" style="background: #f56565; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; margin-left: 0.5rem;">Stop</button>
+            
+            <div id="scrape-output" style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 4px; min-height: 100px; white-space: pre-wrap; font-family: monospace; font-size: 0.9rem;"></div>
+        </div>
+
         <div class="code">
 // Quick example with puterStream
 import { streamPuterCompletion } from './puterStream.js';
@@ -177,7 +202,7 @@ const result = await streamPuterCompletion({
     <script type="module">
         import { generatePuterResponse } from './puterRequest.js';
         import { streamPuterCompletion } from './puterStream.js';
-        import "./scrapeWeb.js";
+        import { scrapeWeb, sampleFiles } from './scrapeWeb.js';
         
         let allModels = [];
         let filteredModels = [];
@@ -482,6 +507,89 @@ const result = await streamPuterCompletion({
                 }
             } catch (error) {
                 output.textContent = `Error: ${error.message}`;
+            }
+        };
+        
+        // Web scraping demo functions
+        let currentAbortController = null;
+        
+        window.testScraping = async function() {
+            const url = document.getElementById('scrape-url').value;
+            const maxPages = parseInt(document.getElementById('max-pages').value) || 5;
+            const maxDepth = parseInt(document.getElementById('max-depth').value) || 2;
+            const output = document.getElementById('scrape-output');
+            
+            if (!url) {
+                output.textContent = 'Please enter a URL to scrape';
+                return;
+            }
+            
+            // Cancel any existing scraping
+            if (currentAbortController) {
+                currentAbortController.abort();
+            }
+            
+            currentAbortController = new AbortController();
+            output.textContent = 'Starting scraping...\n';
+            
+            try {
+                const files = await scrapeWeb(url, {
+                    maxPages,
+                    maxDepth,
+                    concurrency: 3,
+                    aborter: currentAbortController,
+                    onProgress: ({ current, maxPages, pages, filesCount, totalBytes }) => {
+                        output.textContent = `Progress: ${filesCount} files found, ${pages} pages processed, ${Math.round(totalBytes/1024)}KB scraped\n`;
+                    },
+                    onLog: (message) => {
+                        console.log('[Scraper]', message);
+                    },
+                    onFileFound: (fileEntry, stats) => {
+                        console.log(`Found: ${fileEntry.url} (${fileEntry.type}, ${fileEntry.size} bytes)`);
+                    }
+                });
+                
+                const sampled = sampleFiles(files, 32, 300);
+                
+                output.textContent = `Scraping completed!\n\n`;
+                output.textContent += `📊 Summary:\n`;
+                output.textContent += `- Total files found: ${files.length}\n`;
+                output.textContent += `- Sampled files: ${sampled.length}\n`;
+                output.textContent += `- Total size: ${Math.round(files.reduce((sum, f) => sum + f.size, 0) / 1024)}KB\n\n`;
+                
+                output.textContent += `📁 Files found:\n`;
+                files.forEach((file, index) => {
+                    const sizeKB = Math.round(file.size / 1024);
+                    output.textContent += `${index + 1}. ${file.url} (${file.type}, ${sizeKB}KB)\n`;
+                });
+                
+                if (sampled.length > 0) {
+                    output.textContent += `\n📝 Sample content:\n`;
+                    sampled.forEach((file, index) => {
+                        output.textContent += `\n--- ${file.url} ---\n`;
+                        output.textContent += file.sample.substring(0, 500);
+                        if (file.sample.length > 500) {
+                            output.textContent += '... (truncated)';
+                        }
+                        output.textContent += '\n';
+                    });
+                }
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    output.textContent = 'Scraping stopped by user';
+                } else {
+                    output.textContent = `Error: ${error.message}`;
+                }
+            } finally {
+                currentAbortController = null;
+            }
+        };
+        
+        window.stopScraping = function() {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                document.getElementById('scrape-output').textContent = 'Stopping scraping...';
             }
         };
         

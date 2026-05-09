@@ -23,6 +23,7 @@ cd MyAIUtilities
 // Import directly from GitHub Pages
 import { streamPuterCompletion } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterStream.js';
 import { generatePuterResponse } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterRequest.js';
+import { scrapeWeb, sampleFiles } from 'https://noname-isaidnoname.github.io/MyAIUtilities/scrapeWeb.js';
 ```
 
 ## 🔧 Usage Examples
@@ -118,6 +119,72 @@ const result = await generatePuterResponse({
 console.log('AI Response:', result.choices[0].message.content);
 ```
 
+### scrapeWeb.js - Web Scraping Utilities
+
+Extract content from websites with intelligent crawling and filtering:
+
+```javascript
+import { scrapeWeb, sampleFiles } from './scrapeWeb.js';
+// or if you're on another project, do this instead:
+// import { scrapeWeb, sampleFiles } from 'https://noname-isaidnoname.github.io/MyAIUtilities/scrapeWeb.js';
+
+const files = await scrapeWeb('https://example.com', {
+  maxPages: 30,        // Maximum HTML pages to process
+  maxFiles: 300,       // Absolute safety limit on total files
+  maxDepth: 3,         // Maximum crawl depth
+  concurrency: 6,      // Concurrent worker count
+  onProgress: ({ current, maxPages, pages, filesCount, totalBytes }) => {
+    console.log(`Progress: ${filesCount} files, ${pages} pages, ${Math.round(totalBytes/1024)}KB`);
+  },
+  onLog: (message) => {
+    console.log('[Scraper]', message);
+  },
+  onFileFound: (fileEntry, stats) => {
+    console.log(`Found: ${fileEntry.url} (${fileEntry.type}, ${fileEntry.size} bytes)`);
+  }
+});
+
+// Sample files for AI context (limits size)
+const sampled = sampleFiles(files, 32, 300); // 32KB per file, 300KB total
+console.log(`Scraped ${files.length} files, sampled ${sampled.length} for AI`);
+```
+
+#### Key Features
+
+- **Smart Filtering**: Automatically excludes libraries, bundles, and binary files
+- **Concurrent Crawling**: Configurable worker pool for efficient scraping
+- **Content Extraction**: Parses HTML links, CSS imports, and JS modules
+- **Size Management**: Built-in sampling to manage content size for AI context
+- **Progress Tracking**: Real-time callbacks for monitoring progress
+- **Abort Support**: Cancellable operations with AbortController
+
+#### Common Use Cases
+
+```javascript
+// Scrape a documentation site
+const docs = await scrapeWeb('https://docs.example.com', {
+  maxPages: 50,
+  maxDepth: 4,
+  onProgress: (stats) => updateUI(stats)
+});
+
+// Extract code samples from a tutorial
+const tutorial = await scrapeWeb('https://tutorial.example.com', {
+  maxPages: 10,
+  onFileFound: (file) => {
+    if (file.url.includes('/code/')) {
+      processCodeSample(file.content);
+    }
+  }
+});
+
+// Create AI context from website content
+const context = sampleFiles(files, 64, 1024); // Larger limits for AI
+const aiPrompt = `Context from website:\n${context.map(f => 
+  `--- ${f.url} ---\n${f.sample}`
+).join('\n\n')}`;
+```
+
 ## 🏗️ Architecture
 
 ### puterStream.js
@@ -131,6 +198,13 @@ console.log('AI Response:', result.choices[0].message.content);
 - Automatic token rotation on auth failures
 - Usage limit detection and handling
 - Normalizes different response formats
+
+### scrapeWeb.js
+- Intelligent web crawling with concurrent workers
+- Automatic library and bundle filtering
+- Content extraction from HTML, CSS, and JavaScript
+- Size management and sampling for AI context
+- Progress tracking and abort support
 
 ## 🔧 API Reference
 
@@ -163,6 +237,40 @@ console.log('AI Response:', result.choices[0].message.content);
 - `signal` (AbortSignal): Optional abort controller signal
 
 **Returns:** Promise resolving to normalized Puter API response
+
+### scrapeWeb(startUrl, options)
+
+**Parameters:**
+- `startUrl` (string): Starting URL for crawl (must be same-origin)
+- `options.maxPages` (number): Maximum HTML pages to process (default: 30)
+- `options.maxFiles` (number): Absolute safety limit on total files (default: 300)
+- `options.maxDepth` (number): Maximum crawl depth (default: 3)
+- `options.concurrency` (number): Concurrent worker count (default: 6)
+- `options.aborter` (AbortSignal): Signal to abort crawl
+- `options.onProgress` (function): Progress callback ({current, maxPages, pages, filesCount, totalBytes})
+- `options.onLog` (function): Log callback (message)
+- `options.onFileFound` (function): File found callback (fileEntry, stats)
+
+**Returns:** Promise resolving to Array of file entries: `[{url, type, size, content}, ...]`
+
+### sampleFiles(files, maxKBPerFile, maxTotalKB)
+
+**Parameters:**
+- `files` (Array): Array of file entries from scrapeWeb
+- `maxKBPerFile` (number): Maximum KB per file sample (default: 32)
+- `maxTotalKB` (number): Maximum total KB for all samples (default: 600)
+
+**Returns:** Promise resolving to Array of sampled file entries: `[{url, type, size, sample}, ...]`
+
+### Utility Functions
+
+- `isLibraryUrl(url)` - Checks if URL points to known library/bundle
+- `isAllowedType(contentType, url)` - Determines if resource type is allowed
+- `normalizeUrl(raw, base)` - Normalizes relative URLs to absolute
+- `sameOrigin(url, origin)` - Checks if URL shares same origin
+- `extractLinksFromHTML(html, baseUrl)` - Extracts URLs from HTML content
+- `extractImportsFromCSS(css, baseUrl)` - Extracts URLs from CSS imports
+- `extractImportsFromJS(js, baseUrl)` - Extracts URLs from JS imports
 
 ## 🛠️ Development
 

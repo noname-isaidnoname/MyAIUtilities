@@ -4,7 +4,6 @@ A collection of reusable JavaScript utilities for integrating with the Puter.ai 
 
 ## 🚀 Features
 
-- **puterToken.js** - Token creation with multi-strategy auth (temp account, SDK popup, fallback)
 - **puterStream.js** - Real-time streaming helper with tool use support
 - **puterRequest.js** - Non-streaming requests with retry logic and token rotation
 - **scrapeWeb.js** - Web scraping utilities for content extraction
@@ -22,53 +21,12 @@ cd MyAIUtilities
 ### CDN Usage
 ```javascript
 // Import directly from GitHub Pages
-import { createNewToken } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterToken.js';
 import { streamPuterCompletion } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterStream.js';
 import { generatePuterResponse } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterRequest.js';
 import { scrapeWeb, sampleFiles } from 'https://noname-isaidnoname.github.io/MyAIUtilities/scrapeWeb.js';
 ```
 
 ## 🔧 Usage Examples
-
-### puterToken.js - Token Creation
-
-Create a Puter auth token with automatic fallback (temp account → SDK popup → standard popup):
-
-```javascript
-import { createNewToken } from './puterToken.js';
-// or if you're on another project, do this instead:
-// import { createNewToken } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterToken.js';
-
-createNewToken(
-  // onSuccess: called when SDK popup succeeds
-  (result) => {
-    console.log('Token:', result.token);
-    console.log('Username:', result.user.username);
-    // Save the token somewhere
-    localStorage.setItem('puter-token', result.token);
-  },
-  // onError: called if all strategies fail
-  (error) => {
-    console.error('Token creation failed:', error.message);
-  },
-  // shouldTryTempCreation: try REST temp account first (no popup)
-  true,
-  // onTempCreation: called when temp account is created via REST API
-  (data) => {
-    console.log('Temp token:', data.token);
-    console.log('Temp user:', data.user);
-    // Save the token somewhere
-    localStorage.setItem('puter-token', data.token);
-  },
-  // options (optional)
-  { /* puterSdkUrl: 'https://js.puter.com/v2/' */ }
-);
-```
-
-The function tries strategies in order:
-1. REST API temp account via `POST https://api.puter.com/signup` (no popup, only if `shouldTryTempCreation === true`)
-2. Puter SDK popup with `attempt_temp_user_creation: true`
-3. Standard Puter SDK sign-in popup (fallback)
 
 ### puterStream.js - Streaming AI Responses
 
@@ -229,12 +187,6 @@ const aiPrompt = `Context from website:\n${context.map(f =>
 
 ## 🏗️ Architecture
 
-### puterToken.js
-- Multi-strategy token creation with automatic fallback
-- REST API temp account creation (no popup required)
-- Dynamic Puter SDK loading and cleanup
-- Supports both temp and standard sign-in flows
-
 ### puterStream.js
 - Handles newline-delimited JSON streaming
 - Supports tool use (web search, function calls)
@@ -337,7 +289,6 @@ Open `http://localhost:8000` to view the landing page.
 MyAIUtilities/
 ├── index.html          # Landing page
 ├── README.md           # This documentation
-├── puterToken.js       # Token creation utility
 ├── puterStream.js      # Streaming utility
 ├── puterRequest.js     # Non-streaming utility
 └── scrapeWeb.js        # Web scraping utility

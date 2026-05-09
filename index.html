@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyAIUtilities - Puter.ai API Utilities</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 3rem;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        h1 {
+            color: #2d3748;
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        .subtitle {
+            color: #718096;
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+        .github-link {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 1rem 0;
+        }
+        .github-link:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .features {
+            margin: 2rem 0;
+            text-align: left;
+        }
+        .feature {
+            background: #f7fafc;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .code {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            margin: 1rem 0;
+            text-align: left;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        .demo-section {
+            background: #f7fafc;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border: 1px solid #e2e8f0;
+        }
+        .demo-section h3 {
+            margin-top: 0;
+            color: #2d3748;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MyAIUtilities</h1>
+        <p class="subtitle">Reusable utilities for Puter.ai API integration</p>
+        
+        <div class="features">
+            <div class="feature">
+                <strong>🚀 puterStream.js</strong> - Streaming helper for real-time AI responses with tool use support
+            </div>
+            <div class="feature">
+                <strong>🔄 puterRequest.js</strong> - Non-streaming request helper with retry logic and token rotation
+            </div>
+            <div class="feature">
+                <strong>🌐 scrapeWeb.js</strong> - Web scraping utilities for content extraction
+            </div>
+        </div>
+
+        <p>
+            <strong>Visit the GitHub repository to see how to use these utilities:</strong>
+        </p>
+        
+        <a href="https://github.com/noname-isaidnoname/MyAIUtilities" class="github-link" target="_blank">
+            📚 View Documentation & Examples
+        </a>
+
+        <div class="demo-section">
+            <h3>Quick Demo</h3>
+            <p>Test the utilities with a simple request (requires Puter.ai API token):</p>
+            <input type="text" id="api-token" placeholder="Enter your Puter.ai API token" style="width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 4px;">
+            
+            <div style="display: flex; gap: 0.5rem; margin: 0.5rem 0;">
+                <select id="model-select" style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <option value="">Loading models...</option>
+                </select>
+                <button onclick="refreshModels()" style="padding: 0.5rem 1rem; border: 1px solid #ddd; border-radius: 4px; cursor: pointer;">🔄</button>
+            </div>
+            
+            <div style="margin: 0.5rem 0;">
+                <input type="text" id="model-search" placeholder="Search models..." style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            
+            <div style="margin: 0.5rem 0;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="free-only-filter" checked style="margin: 0;">
+                    <span>Free models only</span>
+                </label>
+            </div>
+            
+            <input type="text" id="user-input" placeholder="Ask something..." value="What is 2+2?" style="width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid #ddd; border-radius: 4px;">
+            
+            <div style="margin: 0.5rem 0;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="streaming" style="margin: 0;">
+                    <span>Use streaming (puterStream.js)</span>
+                </label>
+            </div>
+            
+            <button onclick="testUtility()" style="background: #667eea; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer;">Test Utility</button>
+            <div id="output" style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 4px; min-height: 50px; white-space: pre-wrap;"></div>
+        </div>
+
+        <div class="code">
+// Quick example with puterStream
+import { streamPuterCompletion } from './puterStream.js';
+// or if you're on another project, do this instead:
+// import { streamPuterCompletion } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterStream.js';
+
+const result = await streamPuterCompletion({
+    requestBody: {
+        interface: 'puter-chat-completion',
+        driver: 'openai',
+        method: 'complete',
+        args: {
+            model: 'openai/gpt-4o',
+            messages: [{ role: 'user', content: 'Hello!' }],
+            stream: true
+        }
+    },
+    onPartialUpdate: ({ accumulatedContent }) => {
+        // Update your UI here with the accumulated content
+        // For example, you could update a textarea or div with the content
+        // document.getElementById('output').value = accumulatedContent;
+        // console.log('Streaming:', accumulatedContent);
+    }
+});
+        </div>
+    </div>
+
+    <script type="module">
+        import { generatePuterResponse } from './puterRequest.js';
+        import { streamPuterCompletion } from './puterStream.js';
+        import "./scrapeWeb.js";
+        
+        let allModels = [];
+        let filteredModels = [];
+        
+        // Helper function to extract cost info (from PuterGPT)
+        function extractCostInfo(model) {
+            if (!model.costs) {
+                return null;
+            }
+
+            const costs = model.costs;
+            const currency = model.costs_currency || 'usd-cents';
+            const isCents = currency === 'usd-cents';
+            
+            // Extract input cost
+            let inputCost = null;
+            const inputKey = model.input_cost_key || 'prompt_tokens';
+            
+            if (costs[inputKey] !== undefined) {
+                inputCost = costs[inputKey];
+            } else if (costs.prompt !== undefined) {
+                inputCost = costs.prompt;
+            } else if (costs.input !== undefined) {
+                inputCost = costs.input;
+            } else if (costs.input_tokens !== undefined) {
+                inputCost = costs.input_tokens;
+            }
+
+            // Extract output cost
+            let outputCost = null;
+            const outputKey = model.output_cost_key || 'completion_tokens';
+            
+            if (costs[outputKey] !== undefined) {
+                outputCost = costs[outputKey];
+            } else if (costs.completion !== undefined) {
+                outputCost = costs.completion;
+            } else if (costs.output !== undefined) {
+                outputCost = costs.output;
+            } else if (costs.output_tokens !== undefined) {
+                outputCost = costs.output_tokens;
+            }
+
+            // Convert to USD per million tokens
+            const convertToUsdPerMillion = (cost) => {
+                if (cost === null || cost === undefined) return null;
+                
+                // Convert from cents to dollars if needed
+                const usdCost = isCents ? cost / 100 : cost;
+                
+                // Normalize to per million tokens
+                const tokenBase = costs.tokens || 1000000;
+                return (usdCost / tokenBase) * 1000000;
+            };
+
+            return {
+                inputCost: convertToUsdPerMillion(inputCost),
+                outputCost: convertToUsdPerMillion(outputCost),
+                currency: 'USD',
+                isFree: (inputCost === 0 || inputCost === null) && (outputCost === 0 || outputCost === null)
+            };
+        }
+        
+        // Model management functions
+        window.refreshModels = async function() {
+            const token = document.getElementById('api-token').value;
+            const modelSelect = document.getElementById('model-select');
+            
+            if (!token) {
+                modelSelect.innerHTML = '<option value="">Enter API token first</option>';
+                return;
+            }
+            
+            modelSelect.innerHTML = '<option value="">Loading models...</option>';
+            
+            try {
+                const response = await fetch('https://api.puter.com/puterai/chat/models/details', {
+                    signal: AbortSignal.timeout(10000) // 10 second timeout
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch models: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (data.models) {
+                    // Parse model data like PuterGPT does
+                    allModels = data.models.map(m => {
+                        let name = m.name || m.id.split('/').pop();
+                        if (m.costs && m.costs.input_tokens === 0 && m.costs.output_tokens === 0) name += " (Free)";
+                        if (m.description && m.description.toLowerCase().includes('reasoning')) name += " (Reasoning)";
+                        
+                        // Extract cost information
+                        const costInfo = extractCostInfo(m);
+                        
+                        // Check if model supports vision
+                        let supportsVision = false;
+                        if (m.modalities && m.modalities.input && m.modalities.input.includes('image')) {
+                            supportsVision = true;
+                            name += " (Vision)";
+                        } else {
+                            const modelId = m.id || '';
+                            const modelName = m.name || modelId.split('/').pop();
+                            if (modelName.toLowerCase().includes('gemini') || 
+                                modelName.toLowerCase().includes('vision') ||
+                                modelName.toLowerCase().includes('claude') ||
+                                modelId.toLowerCase().includes('gpt-4') ||
+                                modelName.toLowerCase().includes('gpt-4o')) {
+                                supportsVision = true;
+                                name += " (Vision)";
+                            }
+                        }
+                        
+                        // Check if model supports web search
+                        let supportsSearch = false;
+                        if (m.costs && m.costs.web_search !== undefined) {
+                            supportsSearch = true;
+                            name += " (Web Search)";
+                        } else {
+                            const modelId = m.id || '';
+                            const modelName = m.name || modelId.split('/').pop();
+                            const searchPatterns = [
+                                /grok/i,
+                                /gemini-2\.\d+-flash/i,
+                                /gemini-2\.5/i
+                            ];
+                            if (searchPatterns.some(pattern => pattern.test(modelId) || pattern.test(modelName))) {
+                                supportsSearch = true;
+                                name += " (Web Search)";
+                            }
+                        }
+                        
+                        return {
+                            id: m.id,
+                            name: name,
+                            costInfo: costInfo,
+                            supportsVision,
+                            supportsSearch
+                        };
+                    });
+                    filterModels();
+                    
+                    // Cache models in localStorage
+                    localStorage.setItem('cached_models', JSON.stringify(allModels));
+                    localStorage.setItem('models_cache_time', Date.now().toString());
+                } else {
+                    throw new Error('No models data in response');
+                }
+                
+            } catch (error) {
+                console.error('Error fetching models:', error);
+                // Try to load from cache
+                const cached = localStorage.getItem('cached_models');
+                if (cached) {
+                    allModels = JSON.parse(cached);
+                    filterModels();
+                } else {
+                    // Fallback to common free models (from PuterGPT)
+                    allModels = [
+                        { 
+                            id: "openrouter:google/gemini-2.0-flash-lite-preview-02-05:free", 
+                            name: "Gemini 2.0 Flash Lite (Free, Vision)", 
+                            supportsVision: true,
+                            costInfo: { isFree: true, inputCost: 0, outputCost: 0, currency: 'USD' }
+                        },
+                        { 
+                            id: "openrouter:deepseek/deepseek-r1:free", 
+                            name: "DeepSeek R1 (Free, Reasoning)", 
+                            supportsVision: false,
+                            costInfo: { isFree: true, inputCost: 0, outputCost: 0, currency: 'USD' }
+                        },
+                        { 
+                            id: "openrouter:meta-llama/llama-3.3-70b-instruct:free", 
+                            name: "Llama 3.3 70B (Free)", 
+                            supportsVision: false,
+                            costInfo: { isFree: true, inputCost: 0, outputCost: 0, currency: 'USD' }
+                        }
+                    ];
+                    filterModels();
+                }
+            }
+        };
+        
+        window.filterModels = function() {
+            const searchTerm = document.getElementById('model-search').value.toLowerCase();
+            const freeOnly = document.getElementById('free-only-filter').checked;
+            const modelSelect = document.getElementById('model-select');
+            
+            filteredModels = allModels.filter(model => {
+                const matchesSearch = !searchTerm || 
+                    model.id.toLowerCase().includes(searchTerm) || 
+                    model.name.toLowerCase().includes(searchTerm);
+                
+                if (freeOnly) {
+                    const isFreeByName = model.name && model.name.toLowerCase().includes('free');
+                    const isFreeByCost = model.costInfo && model.costInfo.isFree;
+                    return matchesSearch && (isFreeByName || isFreeByCost);
+                }
+                
+                return matchesSearch;
+            });
+            
+            populateModelSelect();
+        };
+        
+        window.populateModelSelect = function() {
+            const modelSelect = document.getElementById('model-select');
+            const currentSelection = modelSelect.value;
+            
+            modelSelect.innerHTML = '';
+            
+            if (filteredModels.length === 0) {
+                modelSelect.innerHTML = '<option value="">No models found</option>';
+                return;
+            }
+            
+            filteredModels.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = `${model.name} (${model.id})`;
+                if (model.id === currentSelection) {
+                    option.selected = true;
+                }
+                modelSelect.appendChild(option);
+            });
+        };
+        
+        window.testUtility = async function() {
+            const token = document.getElementById('api-token').value;
+            const userInput = document.getElementById('user-input').value;
+            const useStreaming = document.getElementById('streaming').checked;
+            const selectedModel = document.getElementById('model-select').value;
+            const output = document.getElementById('output');
+            
+            if (!token) {
+                output.textContent = 'Please enter your Puter.ai API token';
+                return;
+            }
+            
+            if (!userInput) {
+                output.textContent = 'Please enter a question';
+                return;
+            }
+            
+            if (!selectedModel) {
+                output.textContent = 'Please select a model';
+                return;
+            }
+            
+            output.textContent = 'Processing...';
+            
+            try {
+                if (useStreaming) {
+                    // Use streaming utility
+                    output.textContent = '';
+                    const headers = {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${token}`,
+                            'Accept': '*/*'
+                        };
+                    
+                    const result = await streamPuterCompletion({
+                        apiUrl: "https://api.puter.com/drivers/call",
+                        requestBody: {
+                            "interface": "puter-chat-completion",   
+                            "driver": "ai-chat",
+                            "test_mode": true,
+                            "method": "complete",
+                            "args": {
+                                "messages": [{ role: 'user', content: userInput }],
+                                "model": selectedModel,
+                                "stream": true
+                            }
+                        },
+                        headers: headers,
+                        signal: null,
+                        onPartialUpdate: ({ accumulatedContent }) => {
+                            output.textContent = accumulatedContent;
+                        },
+                        onError: (error) => {
+                            console.error('Streaming error:', error);
+                            output.textContent = `Error: ${error.message}`;
+                        }
+                    });
+                } else {
+                    // Use non-streaming utility
+                    const result = await generatePuterResponse({
+                        payload: {
+                            messages: [{ role: 'user', content: userInput }]
+                        },
+                        reqBody: {
+                            model: selectedModel
+                        },
+                        getCurrentToken: () => token,
+                        rotateToken: () => {
+                            console.log('Token rotation not implemented in demo');
+                        },
+                        effectiveMaxRetries: 1
+                    });
+                    
+                    const messageObj = result.choices?.[0]?.message || result.result?.message;
+                    output.textContent = messageObj?.content || 'No content received';
+                }
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+            }
+        };
+        
+        // Event listeners
+        document.getElementById('model-search').addEventListener('input', filterModels);
+        document.getElementById('free-only-filter').addEventListener('change', filterModels);
+        document.getElementById('api-token').addEventListener('change', refreshModels);
+        
+        // Initialize models on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Try to load cached models first
+            const cached = localStorage.getItem('cached_models');
+            const cacheTime = localStorage.getItem('models_cache_time');
+            
+            if (cached && cacheTime && (Date.now() - parseInt(cacheTime)) < 3600000) { // 1 hour cache
+                allModels = JSON.parse(cached);
+                filterModels();
+            } else {
+                refreshModels();
+            }
+        });
+    </script>
+</body>
+</html>

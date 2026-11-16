@@ -6,6 +6,7 @@ A collection of reusable JavaScript utilities for integrating with the Puter.ai 
 
 - **puterStream.js** - Real-time streaming helper with tool use support
 - **puterRequest.js** - Non-streaming requests with retry logic and token rotation
+- **puterResponse.js** - Shared normalization helpers for Puter's inconsistent response shapes
 - **scrapeWeb.js** - Web scraping utilities for content extraction
 
 ## 📦 Installation
@@ -24,6 +25,8 @@ cd MyAIUtilities
 import { streamPuterCompletion } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterStream.js';
 import { generatePuterResponse } from 'https://noname-isaidnoname.github.io/MyAIUtilities/puterRequest.js';
 import { scrapeWeb, sampleFiles } from 'https://noname-isaidnoname.github.io/MyAIUtilities/scrapeWeb.js';
+// puterResponse.js is imported by the two modules above automatically —
+// you only import it yourself if you want the shared normalizers directly.
 ```
 
 ## 🔧 Usage Examples
@@ -189,16 +192,27 @@ const aiPrompt = `Context from website:\n${context.map(f =>
 ## 🏗️ Architecture
 
 ### puterStream.js
-- Handles newline-delimited JSON streaming
+- Handles newline-delimited JSON streaming (tolerates `data:` prefixes and `[DONE]`)
 - Supports tool use (web search, function calls)
+- Accumulates fragmented OpenAI `delta.tool_calls` per index; emits complete, parsed tool calls
+- Falls back to NDJSON aggregation when a `stream: false` request is answered "streamed anyway"
 - Provides callbacks for chunks, partial updates, and completion
-- Automatic error detection and handling
+- Automatic error detection and handling (errors carry a stable `code`)
 
 ### puterRequest.js
 - Implements exponential backoff retry logic
 - Automatic token rotation on auth failures
 - Usage limit detection and handling
+- Normalizes Puter's `{ success, result: { message } }` and OpenAI `{ choices: [...] }` shapes
+- Tolerates NDJSON bodies on non-streaming requests
 - Normalizes different response formats
+
+### puterResponse.js
+- Dependency-free normalizers shared by puterStream.js and puterRequest.js
+- Extracts content/reasoning/message objects across every known Puter response shape
+- Tool-call argument fragment accumulation and normalization
+- No-fallback-model and usage-limit detection
+- Inline `<think>` / `<thinking>` / `<reasoning>` tag extraction
 
 ### scrapeWeb.js
 - Intelligent web crawling with concurrent workers
@@ -224,6 +238,10 @@ const aiPrompt = `Context from website:\n${context.map(f =>
 
 **Returns:** Promise resolving to `{ accumulatedContent, accumulatedReasoning, accumulatedToolUses }`
 
+**Tool call behavior:** Puter-native `{ type: 'tool_use' }` chunks fire `onToolUse` immediately. OpenAI-style `choices[0].delta.tool_calls` arrive in fragments; they are accumulated per `index` and emitted via `onToolUse` (and included in `accumulatedToolUses`) once the stream completes, with fully parsed `input` — never as unparseable partial JSON.
+
+**Errors:** Errors passed to `onError` (and re-thrown) carry a stable `code`: `'NO_FALLBACK_MODEL'`, `'HTTP_ERROR'` (with `.status`), `'PARSE_ERROR'`, `'INVALID_ARGS'`.
+
 ### generatePuterResponse(options)
 
 **Parameters:**
@@ -243,6 +261,25 @@ const aiPrompt = `Context from website:\n${context.map(f =>
   - OpenAI function tools: `[{ type: 'function', function: { name, description, parameters } }]`
 
 **Returns:** Promise resolving to normalized Puter API response with an additional `toolCalls` array: `[{ id, name, input }, ...]`
+
+**Errors:** Thrown errors carry a stable `code`: `'INVALID_ARGS'`, `'HTTP_ERROR'` (with `.status`), `'NO_FALLBACK_MODEL'`, `'USAGE_LIMIT_REACHED'`. The legacy message prefixes (`NO_FALLBACK_MODEL:`, `USAGE_LIMIT_REACHED:`) are kept for backwards compatibility.
+
+### puterResponse.js (shared normalizers)
+
+Imported automatically by `puterStream.js` and `puterRequest.js`; import it directly only if you want the helpers yourself.
+
+- `normalizeAIContent(val)` - Coercion of string/array/object content into a single string
+- `extractPuterContent(obj)` - Assistant text from any known response shape (incl. streaming `delta.content`)
+- `extractPuterReasoning(obj)` - Reasoning/CoT text from any known response shape
+- `extractPuterMessage(obj)` - The message object from `choices[0]` / `result` / bare shapes (synthesizes `obj.choices` when missing, as before)
+- `extractInlineReasoning(content)` - Pulls `<think>` / `<thinking>` / `<reasoning>` tags out of content; returns `{ reasoning, cleaned }`
+- `normalizeToolCalls(rawToolCalls)` - Flattens OpenAI tool_calls into `[{ id, name, input }]` with parsed arguments
+- `createToolCallAccumulator()` - Buffers fragmented streamed `delta.tool_calls`; `push(deltas)` per chunk, `flush()` at the end
+- `parseToolArguments(args)` - JSON.parse with a graceful fallback to the raw string/object
+- `isNoFallbackModelError(value)` - Heuristic detection of Puter's "no fallback model available" error (accepts an object or raw string)
+- `isUsageLimited(result, messageObj?, content?)` - Detects Puter's usage-limit signal
+- `parseStreamLine(line)` - Parses one NDJSON line; tolerates `data:` prefixes and the `[DONE]` sentinel
+- `makePuterError(code, message)` - Error factory with a stable `code` (keeps legacy message prefixes)
 
 ### scrapeWeb(startUrl, options)
 
@@ -297,6 +334,7 @@ MyAIUtilities/
 ├── README.md           # This documentation
 ├── puterStream.js      # Streaming utility
 ├── puterRequest.js     # Non-streaming utility
+├── puterResponse.js    # Shared Puter response normalizers
 └── scrapeWeb.js        # Web scraping utility
 ```
 
